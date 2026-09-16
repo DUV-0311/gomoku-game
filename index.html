@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>五子棋</title>
+<style>
+  :root {
+    --bg: #F5E6D3;
+    --panel: #FFFAF3;
+    --border: #E0D0BE;
+    --accent: #8D6E63;
+    --accent-hover: #6D4C41;
+    --accent-light: #EFEBE9;
+    --text: #3E2723;
+    --text-light: #7D6E63;
+    --shadow: 0 2px 8px rgba(62,39,35,0.08);
+    --radius: 10px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+  }
+  .game-container { max-width: 880px; width: 100%; }
+
+  /* Title */
+  .title-bar {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .title-bar h1 {
+    font-family: Georgia, "STSong", serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 8px;
+    color: var(--text);
+  }
+  .title-bar .subtitle {
+    font-size: 13px;
+    color: var(--text-light);
+    margin-top: 4px;
+    letter-spacing: 2px;
+  }
+
+  /* Layout */
+  .game-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  /* Board */
+  .board-wrapper {
+    flex-shrink: 0;
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(62,39,35,0.15);
+  }
+  #board {
+    display: block;
+    cursor: crosshair;
+  }
+  #board.locked { cursor: not-allowed; }
+
+  /* Panel */
+  .panel {
+    width: 260px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-light);
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+  }
+
+  /* Difficulty buttons */
+  .diff-group {
+    display: flex;
+    gap: 8px;
+  }
+  .diff-btn {
+    flex: 1;
+    padding: 8px 0;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .diff-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .diff-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  /* Game info */
+  .info-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .info-row:last-child { margin-bottom: 0; }
+  .info-label { color: var(--text-light); width: 48px; }
+  .info-value { font-weight: 600; }
+  .stone-icon {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  .stone-icon.black { background: radial-gradient(circle at 35% 35%, #555, #1a1a1a); }
+  .stone-icon.white { background: radial-gradient(circle at 35% 35%, #fff, #d0d0d0); border: 1px solid #bbb; }
+
+  /* Stats */
+  .stats-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .stat-item {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    background: var(--accent-light);
+    border-radius: 8px;
+  }
+  .stat-value {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+
+  /* Buttons */
+  .btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text-light);
+    border: 1px solid var(--border);
+    font-size: 13px;
+    padding: 7px;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* AI thinking */
+  .thinking {
+    display: none;
+    text-align: center;
+    padding: 10px;
+    font-size: 14px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .thinking.show { display: block; }
+  .thinking::after {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    animation: dots 1.2s infinite;
+  }
+  @keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
+  }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(62,39,35,0.35);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+  }
+  .modal-overlay.show {
+    display: flex;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .modal-card {
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 32px 40px;
+    text-align: center;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+    min-width: 280px;
+    animation: scaleIn 0.3s ease;
+  }
+  @keyframes scaleIn {
+    from { transform: scale(0.85); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+  .modal-card h2 {
+    font-family: Georgia, "STSong", serif;
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+  .modal-card .modal-sub {
+    font-size: 14px;
+    color: var(--text-light);
+    margin-bottom: 20px;
+  }
+  .modal-card .btn { width: 180px; margin: 0 auto; }
+  .modal-btns { display: flex; gap: 10px; justify-content: center; }
+  .modal-btns .btn { width: 120px; }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="title-bar">
+    <h1>五　子　棋</h1>
+    <div class="subtitle">人机对战 · 随机黑白 · 即开即玩</div>
+  </div>
+  <div class="game-layout">
+    <div class="board-wrapper">
+      <canvas id="board"></canvas>
+    </div>
+    <div class="panel">
+      <!-- Difficulty -->
+      <div class="card">
+        <div class="card-title">难度选择</div>
+        <div class="diff-group">
+          <button class="diff-btn" data-diff="easy">简单</button>
+          <button class="diff-btn active" data-diff="medium">中等</button>
+          <button class="diff-btn" data-diff="hard">困难</button>
+        </div>
+      </div>
+      <!-- Game info -->
+      <div class="card">
+        <div class="card-title">当前对局</div>
+        <div class="info-row">
+          <span class="info-label">执子</span>
+          <span class="info-value" id="colorDisplay">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">回合</span>
+          <span class="info-value" id="moveCount">第 0 手</span>
+        </div>
+        <div class="thinking" id="thinking">AI 思考中</div>
+      </div>
+      <!-- Stats -->
+      <div class="card">
+        <div class="card-title">战绩统计</div>
+        <div class="stats-row">
+          <div class="stat-item">
+            <div class="stat-value" id="statWins">0</div>
+            <div class="stat-label">胜</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="statLosses">0</div>
+            <div class="stat-label">负</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="statRate">0%</div>
+            <div class="stat-label">胜率</div>
+          </div>
+        </div>
+        <button class="btn btn-secondary" id="clearStatsBtn">清空统计</button>
+      </div>
+      <!-- Restart -->
+      <button class="btn btn-primary" id="restartBtn">重新开始</button>
+    </div>
+  </div>
+</div>
+
+<!-- Result Modal -->
+<div class="modal-overlay" id="resultModal">
+  <div class="modal-card">
+    <h2 id="resultTitle"></h2>
+    <div class="modal-sub" id="resultSub"></div>
+    <button class="btn btn-primary" id="playAgainBtn">再来一局</button>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-card">
+    <p id="confirmText" style="font-size:15px;margin-bottom:20px;line-height:1.6;"></p>
+    <div class="modal-btns">
+      <button class="btn btn-primary" id="confirmYes">确认</button>
+      <button class="btn btn-secondary" id="confirmNo" style="width:120px;">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// === Constants ===
+const BOARD = 15;
+const CELL = 36;
+const PAD = 28;
+const SIZE = (BOARD - 1) * CELL + PAD * 2;
+const RADIUS = 15.5;
+const STARS = [[3,3],[3,11],[7,7],[11,3],[11,11]];
+
+const PARAMS = {
+  easy:   { range: 1, off: 0.3, def: 0.7, rnd: 0.5 },
+  medium: { range: 2, off: 0.5, def: 0.5, rnd: 0   },
+  hard:   { range: 2, off: 0.6, def: 0.4, rnd: 0   },
+};
+
+// === State ===
+let board, turn, pColor, aColor, over, diff = 'medium', lastMV, thinking, hover, mvCount, winLine;
+let stats = { wins: 0, losses: 0, total: 0 };
+let anims = [];
+let confirmCb = null;
+
+// === Canvas ===
+const cv = document.getElementById('board');
+const cx = cv.getContext('2d');
+let bgCv, bgCx;
+let grain = [];
+
+function initCanvas() {
+  cv.width = SIZE; cv.height = SIZE;
+  bgCv = document.createElement('canvas');
+  bgCv.width = SIZE; bgCv.height = SIZE;
+  bgCx = bgCv.getContext('2d');
+  initGrain();
+  drawBg();
+}
+
+function initGrain() {
+  for (let i = 0; i < 30; i++) {
+    grain.push({
+      y: Math.random() * SIZE,
+      a: 0.02 + Math.random() * 0.05,
+      w: 0.5 + Math.random() * 2.5,
+      o1: (Math.random() - 0.5) * 12,
+      o2: (Math.random() - 0.5) * 12,
+      o3: (Math.random() - 0.5) * 18,
+    });
+  }
+}
+
+function drawBg() {
+  // Wood base gradient
+  const g = bgCx.createLinearGradient(0, 0, 0, SIZE);
+  g.addColorStop(0, '#E8C88D');
+  g.addColorStop(0.5, '#DDB87A');
+  g.addColorStop(1, '#D2A86A');
+  bgCx.fillStyle = g;
+  bgCx.fillRect(0, 0, SIZE, SIZE);
+
+  // Wood grain
+  for (const l of grain) {
+    bgCx.strokeStyle = `rgba(139,90,43,${l.a})`;
+    bgCx.lineWidth = l.w;
+    bgCx.beginPath();
+    bgCx.moveTo(0, l.y);
+    bgCx.bezierCurveTo(SIZE * 0.3, l.y + l.o1, SIZE * 0.7, l.y + l.o2, SIZE, l.y + l.o3);
+    bgCx.stroke();
+  }
+
+  // Grid lines
+  bgCx.strokeStyle = 'rgba(62,39,35,0.7)';
+  bgCx.lineWidth = 1;
+  for (let i = 0; i < BOARD; i++) {
+    const p = PAD + i * CELL;
+    bgCx.beginPath();
+    bgCx.moveTo(PAD, p); bgCx.lineTo(SIZE - PAD, p); bgCx.stroke();
+    bgCx.beginPath();
+    bgCx.moveTo(p, PAD); bgCx.lineTo(p, SIZE - PAD); bgCx.stroke();
+  }
+
+  // Star points
+  bgCx.fillStyle = '#3E2723';
+  for (const [r, c] of STARS) {
+    bgCx.beginPath();
+    bgCx.arc(PAD + c * CELL, PAD + r * CELL, 3, 0, Math.PI * 2);
+    bgCx.fill();
+  }
+}
+
+// === Stone drawing ===
+function drawStone(ctx, r, c, color, scale) {
+  const x = PAD + c * CELL, y = PAD + r * CELL;
+  const rad = RADIUS * scale;
+
+  // Shadow
+  ctx.beginPath();
+  ctx.arc(x + 1.5, y + 2, rad, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.fill();
+
+  // Stone body
+  const grd = ctx.createRadialGradient(x - rad * 0.3, y - rad * 0.3, rad * 0.1, x, y, rad);
+  if (color === 1) {
+    grd.addColorStop(0, '#666');
+    grd.addColorStop(0.4, '#2a2a2a');
+    grd.addColorStop(1, '#0a0a0a');
+  } else {
+    grd.addColorStop(0, '#ffffff');
+    grd.addColorStop(0.5, '#f0f0f0');
+    grd.addColorStop(1, '#c8c8c8');
+  }
+  ctx.beginPath();
+  ctx.arc(x, y, rad, 0, Math.PI * 2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+
+  if (color === 2) {
+    ctx.strokeStyle = 'rgba(160,160,160,0.5)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+}
+
+// === Render loop ===
+function render() {
+  cx.drawImage(bgCv, 0, 0);
+
+  const now = performance.now();
+
+  // Draw stones with animation
+  for (let r = 0; r < BOARD; r++) {
+    for (let c = 0; c < BOARD; c++) {
+      if (board[r][c] !== 0) {
+        let scale = 1;
+        const anim = anims.find(a => a.row === r && a.col === c);
+        if (anim) {
+          const t = (now - anim.t0) / 200;
+          if (t < 1) {
+            scale = easeBack(t);
+          } else {
+            anims = anims.filter(a => a !== anim);
+          }
+        }
+        drawStone(cx, r, c, board[r][c], scale);
+      }
+    }
+  }
+
+  // Last move marker
+  if (lastMV && !over) {
+    const x = PAD + lastMV.col * CELL, y = PAD + lastMV.row * CELL;
+    cx.beginPath();
+    cx.arc(x, y, 3.5, 0, Math.PI * 2);
+    cx.fillStyle = '#E53935';
+    cx.fill();
+  }
+
+  // Win line
+  if (winLine && winLine.length >= 5) {
+    const a = winLine[0], b = winLine[4];
+    cx.strokeStyle = 'rgba(255,111,0,0.8)';
+    cx.lineWidth = 4;
+    cx.lineCap = 'round';
+    cx.beginPath();
+    cx.moveTo(PAD + a.col * CELL, PAD + a.row * CELL);
+    cx.lineTo(PAD + b.col * CELL, PAD + b.row * CELL);
+    cx.stroke();
+  }
+
+  // Hover preview
+  if (hover && !over && !thinking && turn === pColor) {
+    const x = PAD + hover.col * CELL, y = PAD + hover.row * CELL;
+    cx.beginPath();
+    cx.arc(x, y, RADIUS, 0, Math.PI * 2);
+    cx.fillStyle = pColor === 1 ? 'rgba(26,26,26,0.35)' : 'rgba(245,245,245,0.5)';
+    cx.fill();
+    if (pColor === 2) {
+      cx.strokeStyle = 'rgba(160,160,160,0.4)';
+      cx.lineWidth = 1;
+      cx.stroke();
+    }
+  }
+
+  requestAnimationFrame(render);
+}
+
+function easeBack(t) {
+  const c1 = 1.70158, c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
+// === Game logic ===
+function newGame() {
+  board = Array.from({ length: BOARD }, () => Array(BOARD).fill(0));
+  over = false; lastMV = null; thinking = false;
+  hover = null; mvCount = 0; winLine = null; anims = [];
+  pColor = Math.random() < 0.5 ? 1 : 2;
+  aColor = pColor === 1 ? 2 : 1;
+  turn = 1; // Black always first
+  cv.classList.remove('locked');
+  updateUI();
+
+  if (turn === aColor) {
+    setTimeout(aiTurn, 400);
+  }
+}
+
+function place(r, c, color, animate) {
+  board[r][c] = color;
+  lastMV = { row: r, col: c };
+  mvCount++;
+  if (animate) anims.push({ row: r, col: c, t0: performance.now() });
+  updateUI();
+}
+
+function playerMove(r, c) {
+  if (over || thinking || turn !== pColor || board[r][c] !== 0) return;
+  place(r, c, pColor, true);
+  const line = checkWin(r, c, pColor);
+  if (line) { endGame(line, true); return; }
+  if (isFull()) { endGame(null, null); return; }
+  turn = aColor;
+  updateUI();
+  setTimeout(aiTurn, 300);
+}
+
+function aiTurn() {
+  if (over) return;
+  thinking = true;
+  updateUI();
+
+  setTimeout(() => {
+    const mv = calcAIMove();
+    if (mv) {
+      place(mv.row, mv.col, aColor, true);
+      const line = checkWin(mv.row, mv.col, aColor);
+      if (line) { endGame(line, false); thinking = false; updateUI(); return; }
+      if (isFull()) { endGame(null, null); thinking = false; updateUI(); return; }
+      turn = pColor;
+    }
+    thinking = false;
+    updateUI();
+  }, 100);
+}
+
+function endGame(line, playerWon) {
+  over = true;
+  cv.classList.add('locked');
+  winLine = line;
+
+  if (playerWon === null) {
+    // Draw
+    stats.total++;
+    saveStats();
+    updateUI();
+    showResult('平局', '棋盘已满，势均力敌');
+  } else if (playerWon) {
+    stats.wins++; stats.total++;
+    saveStats();
+    updateUI();
+    showResult('你赢了', '恭喜，棋艺精湛');
+  } else {
+    stats.losses++; stats.total++;
+    saveStats();
+    updateUI();
+    showResult('你输了', '再接再厉，再来一局');
+  }
+}
+
+function isFull() {
+  for (let r = 0; r < BOARD; r++)
+    for (let c = 0; c < BOARD; c++)
+      if (board[r][c] === 0) return false;
+  return true;
+}
+
+function checkWin(r, c, color) {
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  for (const [dr, dc] of dirs) {
+    let stones = [{ row: r, col: c }];
+    let nr = r + dr, nc = c + dc;
+    while (inB(nr, nc) && board[nr][nc] === color) {
+      stones.push({ row: nr, col: nc });
+      nr += dr; nc += dc;
+    }
+    nr = r - dr; nc = c - dc;
+    while (inB(nr, nc) && board[nr][nc] === color) {
+      stones.unshift({ row: nr, col: nc });
+      nr -= dr; nc -= dc;
+    }
+    if (stones.length >= 5) return stones.slice(0, 5);
+  }
+  return null;
+}
+
+function inB(r, c) { return r >= 0 && r < BOARD && c >= 0 && c < BOARD; }
+
+// === AI Engine ===
+function calcAIMove() {
+  // First move: center
+  let hasStone = false;
+  for (let r = 0; r < BOARD; r++)
+    for (let c = 0; c < BOARD; c++)
+      if (board[r][c] !== 0) { hasStone = true; break; }
+  if (!hasStone) return { row: 7, col: 7 };
+
+  const candidates = getCands();
+  if (candidates.length === 0) return { row: 7, col: 7 };
+
+  // Score each candidate
+  const scored = candidates.map(p => ({
+    ...p,
+    off: evalPt(p.row, p.col, aColor),
+    def: evalPt(p.row, p.col, pColor),
+  }));
+
+  // Immediate win check
+  for (const s of scored) if (s.off >= 100000) return s;
+  // Must block
+  for (const s of scored) if (s.def >= 100000) return s;
+
+  const pm = PARAMS[diff];
+  scored.forEach(s => {
+    s.combined = s.off * pm.off + s.def * pm.def;
+  });
+  scored.sort((a, b) => b.combined - a.combined);
+
+  // Easy: 50% random
+  if (diff === 'easy') {
+    if (Math.random() < pm.rnd) {
+      // Block only if opponent has a strong threat
+      const threat = scored.find(s => s.def >= 1000);
+      if (threat) return threat;
+      const pool = scored.slice(0, Math.min(scored.length, 12));
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+    return scored[0];
+  }
+
+  // Hard: 1-ply lookahead on top 5
+  if (diff === 'hard') {
+    const top = scored.slice(0, Math.min(5, scored.length));
+    let bestEval = -Infinity, best = top[0];
+    for (const m of top) {
+      board[m.row][m.col] = aColor;
+      // Opponent's best response
+      const oppCands = getCands();
+      let oppBest = 0;
+      for (const o of oppCands) {
+        const v = evalPt(o.row, o.col, pColor);
+        if (v > oppBest) oppBest = v;
+      }
+      board[m.row][m.col] = 0;
+      const ev = m.combined - oppBest * 0.8;
+      if (ev > bestEval) { bestEval = ev; best = m; }
+    }
+    return best;
+  }
+
+  return scored[0];
+}
+
+function getCands() {
+  const set = new Set();
+  const arr = [];
+  const range = PARAMS[diff].range;
+  for (let r = 0; r < BOARD; r++) {
+    for (let c = 0; c < BOARD; c++) {
+      if (board[r][c] !== 0) {
+        for (let dr = -range; dr <= range; dr++) {
+          for (let dc = -range; dc <= range; dc++) {
+            const nr = r + dr, nc = c + dc;
+            if (inB(nr, nc) && board[nr][nc] === 0) {
+              const k = nr * BOARD + nc;
+              if (!set.has(k)) { set.add(k); arr.push({ row: nr, col: nc }); }
+            }
+          }
+        }
+      }
+    }
+  }
+  return arr;
+}
+
+function evalPt(row, col, color) {
+  if (board[row][col] !== 0) return 0;
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  let total = 0;
+
+  for (const [dr, dc] of dirs) {
+    let count = 1, openEnds = 0, jumpBonus = 0;
+
+    // Forward
+    let r = row + dr, c = col + dc;
+    while (inB(r, c) && board[r][c] === color) { count++; r += dr; c += dc; }
+    if (inB(r, c) && board[r][c] === 0) {
+      openEnds++;
+      let r2 = r + dr, c2 = c + dc, jc = 0;
+      while (inB(r2, c2) && board[r2][c2] === color) { jc++; r2 += dr; c2 += dc; }
+      if (jc > 0) {
+        const tc = count + jc;
+        if (tc >= 4) jumpBonus += 800;
+        else if (tc >= 3) jumpBonus += 200;
+        else if (tc >= 2) jumpBonus += 50;
+      }
+    }
+
+    // Backward
+    r = row - dr; c = col - dc;
+    while (inB(r, c) && board[r][c] === color) { count++; r -= dr; c -= dc; }
+    if (inB(r, c) && board[r][c] === 0) {
+      openEnds++;
+      let r2 = r - dr, c2 = c - dc, jc = 0;
+      while (inB(r2, c2) && board[r2][c2] === color) { jc++; r2 -= dr; c2 -= dc; }
+      if (jc > 0) {
+        const tc = count + jc;
+        if (tc >= 4) jumpBonus += 800;
+        else if (tc >= 3) jumpBonus += 200;
+        else if (tc >= 2) jumpBonus += 50;
+      }
+    }
+
+    total += patternScore(count, openEnds) + jumpBonus;
+  }
+  return total;
+}
+
+function patternScore(count, openEnds) {
+  if (count >= 5) return 100000;
+  if (count === 4) {
+    if (openEnds === 2) return 10000;
+    if (openEnds === 1) return 1000;
+  }
+  if (count === 3) {
+    if (openEnds === 2) return 1000;
+    if (openEnds === 1) return 100;
+  }
+  if (count === 2) {
+    if (openEnds === 2) return 100;
+    if (openEnds === 1) return 10;
+  }
+  if (count === 1) {
+    if (openEnds === 2) return 10;
+    if (openEnds === 1) return 1;
+  }
+  return 0;
+}
+
+// === UI ===
+function updateUI() {
+  // Color display
+  const cd = document.getElementById('colorDisplay');
+  if (pColor === 1) cd.innerHTML = '<span class="stone-icon black"></span>黑棋（先手）';
+  else if (pColor === 2) cd.innerHTML = '<span class="stone-icon white"></span>白棋（后手）';
+  else cd.textContent = '—';
+
+  // Move count
+  document.getElementById('moveCount').textContent = `第 ${mvCount} 手`;
+
+  // Thinking
+  const th = document.getElementById('thinking');
+  th.classList.toggle('show', thinking);
+
+  // Stats
+  document.getElementById('statWins').textContent = stats.wins;
+  document.getElementById('statLosses').textContent = stats.losses;
+  const rate = stats.total > 0 ? Math.round(stats.wins / stats.total * 100) : 0;
+  document.getElementById('statRate').textContent = rate + '%';
+
+  // Board cursor
+  cv.classList.toggle('locked', over || thinking || turn !== pColor);
+
+  // Difficulty buttons
+  document.querySelectorAll('.diff-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.diff === diff);
+  });
+}
+
+function showResult(title, sub) {
+  document.getElementById('resultTitle').textContent = title;
+  document.getElementById('resultSub').textContent = sub;
+  document.getElementById('resultModal').classList.add('show');
+}
+
+function showConfirm(msg, cb) {
+  document.getElementById('confirmText').textContent = msg;
+  document.getElementById('confirmModal').classList.add('show');
+  confirmCb = cb;
+}
+
+// === Stats ===
+function loadStats() {
+  try {
+    const s = JSON.parse(localStorage.getItem('gomoku_stats') || '{}');
+    stats.wins = s.wins || 0;
+    stats.losses = s.losses || 0;
+    stats.total = s.total || 0;
+  } catch (e) {}
+}
+function saveStats() {
+  localStorage.setItem('gomoku_stats', JSON.stringify(stats));
+}
+function clearStats() {
+  stats = { wins: 0, losses: 0, total: 0 };
+  saveStats();
+  updateUI();
+}
+
+// === Event handlers ===
+function getCoord(e) {
+  const rect = cv.getBoundingClientRect();
+  const sx = cv.width / rect.width;
+  const sy = cv.height / rect.height;
+  const x = (e.clientX - rect.left) * sx;
+  const y = (e.clientY - rect.top) * sy;
+  const col = Math.round((x - PAD) / CELL);
+  const row = Math.round((y - PAD) / CELL);
+  return { row, col };
+}
+
+cv.addEventListener('click', e => {
+  if (over || thinking || turn !== pColor) return;
+  const { row, col } = getCoord(e);
+  if (inB(row, col) && board[row][col] === 0) playerMove(row, col);
+});
+
+cv.addEventListener('mousemove', e => {
+  if (over || thinking || turn !== pColor) { hover = null; return; }
+  const { row, col } = getCoord(e);
+  if (inB(row, col) && board[row][col] === 0) hover = { row, col };
+  else hover = null;
+});
+
+cv.addEventListener('mouseleave', () => { hover = null; });
+
+document.getElementById('restartBtn').addEventListener('click', () => newGame());
+
+document.getElementById('playAgainBtn').addEventListener('click', () => {
+  document.getElementById('resultModal').classList.remove('show');
+  newGame();
+});
+
+document.getElementById('clearStatsBtn').addEventListener('click', () => {
+  showConfirm('确定要清空所有战绩统计吗？此操作不可恢复。', clearStats);
+});
+
+document.querySelectorAll('.diff-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.diff === diff) return;
+    const newDiff = btn.dataset.diff;
+    if (mvCount > 0 && !over) {
+      showConfirm('切换难度将重新开始当前对局，是否继续？', () => {
+        diff = newDiff;
+        newGame();
+      });
+    } else {
+      diff = newDiff;
+      newGame();
+    }
+  });
+});
+
+document.getElementById('confirmYes').addEventListener('click', () => {
+  document.getElementById('confirmModal').classList.remove('show');
+  if (confirmCb) { confirmCb(); confirmCb = null; }
+});
+document.getElementById('confirmNo').addEventListener('click', () => {
+  document.getElementById('confirmModal').classList.remove('show');
+  confirmCb = null;
+});
+
+// === Init ===
+initCanvas();
+loadStats();
+newGame();
+render();
+</script>
+</body>
+</html>
